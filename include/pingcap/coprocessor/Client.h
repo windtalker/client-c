@@ -140,6 +140,7 @@ private:
             const copTask & task = tasks[task_index];
             task_index++;
             lk.unlock();
+            log->information("start handle region " + task.region_id.toString());
             handle_task(task);
         }
     }

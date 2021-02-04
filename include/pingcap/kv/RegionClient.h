@@ -46,6 +46,7 @@ struct RegionClient
                 // of date and already be cleaned up. We can skip the
                 // RPC by returning RegionError directly.
 
+                log->information("Region " + region_id.toString() + " invalid in local cache, skip sending request");
                 throw Exception("Region epoch not match!", RegionEpochNotMatch);
             }
             const auto & store_addr = ctx->addr;

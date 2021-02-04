@@ -29,6 +29,7 @@ std::vector<copTask> buildCopTasks(
         // all ranges belong to same region.
         if (i == ranges.size())
         {
+            log->information("Adding region " + loc.region.toString());
             tasks.push_back(copTask{loc.region, ranges, cop_req, store_type});
             break;
         }
@@ -39,6 +40,7 @@ std::vector<copTask> buildCopTasks(
             task_ranges.push_back(KeyRange{bound.start_key, loc.end_key});
             bound.start_key = loc.end_key;
         }
+        log->information("Adding region " + loc.region.toString());
         tasks.push_back(copTask{loc.region, task_ranges, cop_req, store_type});
         ranges.erase(ranges.begin(), ranges.begin() + i);
     }
@@ -72,6 +74,7 @@ std::vector<copTask> ResponseIter::handle_task_impl(kv::Backoffer & bo, const co
     catch (Exception & e)
     {
         bo.backoff(kv::boRegionMiss, e);
+        log->information("catch exception when send req to region " + e.displayText());
         return buildCopTasks(bo, cluster, task.ranges, task.req, task.store_type, log);
     }
     if (resp->has_locked())
@@ -88,6 +91,7 @@ std::vector<copTask> ResponseIter::handle_task_impl(kv::Backoffer & bo, const co
         {
             bo.backoffWithMaxSleep(kv::boTxnLockFast, before_expired, Exception(resp->locked().DebugString(), ErrorCodes::LockError));
         }
+        log->information("meet lock error for cop request");
         return buildCopTasks(bo, cluster, task.ranges, task.req, task.store_type, log);
     }
 
@@ -107,14 +111,20 @@ std::vector<copTask> ResponseIter::handle_task_impl(kv::Backoffer & bo, const co
 
 void ResponseIter::handle_task(const copTask & task)
 {
-    kv::Backoffer bo(kv::copNextMaxBackoff);
+    //kv::Backoffer bo(kv::copNextMaxBackoff);
+    std::unordered_map<uint64_t, std::shared_ptr<kv::Backoffer>> bo_maps;
     std::vector<copTask> remain_tasks({task});
     size_t idx = 0;
     while (idx < remain_tasks.size())
     {
         try
         {
-            auto new_tasks = handle_task_impl(bo, remain_tasks[idx]);
+            std::shared_ptr<kv::Backoffer> bo_ptr = nullptr;
+            if (bo_maps.find(remain_tasks[idx].region_id.id) == bo_maps.end())
+            {
+                bo_maps[remain_tasks[idx].region_id.id] = std::make_shared<kv::Backoffer>(kv::copNextMaxBackoff);
+            }
+            auto new_tasks = handle_task_impl(*bo_maps[remain_tasks[idx].region_id.id], remain_tasks[idx]);
             if (new_tasks.size() > 0)
             {
                 remain_tasks.insert(remain_tasks.end(), new_tasks.begin(), new_tasks.end());
