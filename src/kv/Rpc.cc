@@ -4,8 +4,9 @@ namespace pingcap
 {
 namespace kv
 {
-
-ConnArray::ConnArray(size_t max_size, const std::string & addr, const ClusterConfig & config_) : address(addr), index(0)
+ConnArray::ConnArray(size_t max_size, const std::string & addr, const ClusterConfig & config_)
+    : address(addr)
+    , index(0)
 {
     vec.resize(max_size);
     for (size_t i = 0; i < max_size; i++)
@@ -34,7 +35,7 @@ ConnArrayPtr RpcClient::getConnArray(const std::string & addr)
 
 ConnArrayPtr RpcClient::createConnArray(const std::string & addr)
 {
-    auto conn_array = std::make_shared<ConnArray>(5, addr, config);
+    auto conn_array = std::make_shared<ConnArray>(1, addr, config);
     conns[addr] = conn_array;
     return conn_array;
 }
